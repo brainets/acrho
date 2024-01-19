@@ -2,6 +2,14 @@
 from itertools import combinations
 import numpy as np
 import hoi
+import frites
+
+def rsi_create_fit(data, beh, minsize=2, maxsize=3, method='gcmi'):
+    
+    model = hoi.metrics.RSI(data, beh)
+    res=model.fit(minsize=minsize, maxsize=maxsize, method=method)
+
+    return res
 
 def oinfo_min(oinfo_array, list_indices,minsize):
 
@@ -81,17 +89,63 @@ def oinfo_min_task(oinfo_array, list_indices,minsize,nroi,ny=1):
 
     return oi_array
 
+def mi_create_fit(data, beh):
+    
+    list_data_sub = [data,]
+    list_beh_sub = [beh,]
 
-def goinfo_create_fit(data_brain, beh, minsize=3, maxsize=4):
+    class_final_sub = frites.dataset.DatasetEphy(list_data_sub, y=list_beh_sub, attrs=None)
+    wf = frites.workflow.WfMi()
+    mi, pvalues = wf.fit(class_final_sub, mcp=None)
+
+    return mi.T
+
+def centrality_nodes(oinf_result, nodes, list_indices, normalized=True):
+
+    n_nodes=len(nodes)
+    n_times=oinf_result.shape[1]
+
+    centrality_results=np.zeros((n_nodes, n_times))
+    for i in nodes:
+        s=np.zeros(n_times)
+        cc=0
+        for jj, j in enumerate(list_indices):
+
+            if i in j:
+                s+=oinf_result[jj,:]
+                cc+=1
+        
+        centrality_results[i, :]=s/cc
+
+    return centrality_results
+
+def centrality_create_fit_correction(data_brain, beh, minsize=3, maxsize=4, method='gcmi', normalized=True):
+
+    n_features=data_brain.shape[1]
+    model = hoi.metrics.GradientOinfo(data_brain, beh)
+    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
+
+    combos=model.get_combinations(minsize=minsize, maxsize=maxsize)[0]
+    list_indices=[[int(c) for c in comb if c != -1] for comb in combos]
+    list_multiplets=[str([int(i) for i in comb]) for comb in list_indices]
+
+    #Here we use the function defined in utils to "clean" the higher-order spreading
+    goinfo_proc=oinfo_min(goinfo, list_indices, minsize=minsize)
+    
+    nodes=np.arange(n_features)
+    res_cen= centrality_nodes(goinfo_proc, nodes, list_indices, normalized=normalized)
+    return res_cen
+
+def goinfo_create_fit(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
 
     model = hoi.metrics.GradientOinfo(data_brain, beh)
-    goinfo = model.fit(minsize=minsize, maxsize=maxsize)
+    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
     return goinfo
 
-def goinfo_create_fit_correction(data_brain, beh, minsize=3, maxsize=4):
+def goinfo_create_fit_correction(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
 
     model = hoi.metrics.GradientOinfo(data_brain, beh)
-    goinfo = model.fit(minsize=minsize, maxsize=maxsize)
+    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
 
     combos=model.get_combinations(minsize=minsize, maxsize=maxsize)[0]
     list_indices=[[int(c) for c in comb if c != -1] for comb in combos]
@@ -102,15 +156,15 @@ def goinfo_create_fit_correction(data_brain, beh, minsize=3, maxsize=4):
 
     return goinfo_proc
 
-def task_oinfo_create_fit_correction(data_brain, beh, minsize=2, maxsize=4):
+def task_oinfo_create_fit_correction(data_brain, beh, minsize=2, maxsize=4, method='gcmi'):
 
     nfeat=data_brain.shape[1]
     yfeat=beh.shape[1]
     modely = hoi.metrics.Oinfo(data_brain, beh)
-    oinfoy = modely.fit(minsize=minsize, maxsize=maxsize)
+    oinfoy = modely.fit(minsize=minsize, maxsize=maxsize, method=method)
 
     model = hoi.metrics.Oinfo(data_brain)
-    oinfo = model.fit(minsize=minsize, maxsize=maxsize)
+    oinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
 
     oinfo_tot=np.vstack((oinfoy,oinfo))
 
