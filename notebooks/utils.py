@@ -12,8 +12,68 @@ def saving(obj, name):
 def loading(name):
     with open(name,"rb") as f:
         loaded_obj=pickle.load(f)
-        
     return loaded_obj
+
+def goinfo_create_fit(data_brain, beh, **kwmodel, **kwfit):
+    
+    model = hoi.metrics.GradientOinfo(data_brain, beh, **kwmodel)
+    goinfo = model.fit(**kwfit)
+    return goinfo
+
+def redundancyMMI_fit(data_brain, beh, **kwmodel, **kwfit):
+
+    model = hoi.metrics.RedundancyMMI(data_brain, beh, **kwmodel)
+    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
+    return goinfo
+
+def synergyMMI_fit(data_brain, beh, **kwmodel, **kwfit):
+
+    model = hoi.metrics.SynergyMMI(data_brain, beh, **kwmodel)
+    goinfo = model.fit(**kwfit)
+    return goinfo
+
+def goinfo_create_fit_correction(data_brain, beh, minsize=3, maxsize=4, **kwmodel, **kwfit):
+
+    model = hoi.metrics.GradientOinfo(data_brain, beh, **kwmodel)
+    goinfo = model.fit(**kwfit)
+
+    combos=model.get_combinations(minsize=minsize, maxsize=maxsize)[0]
+    list_indices=[[int(c) for c in comb if c != -1] for comb in combos]
+    list_multiplets=[str([int(i) for i in comb]) for comb in list_indices]
+
+    #Here we use the function defined in utils to "clean" the higher-order spreading
+    goinfo_proc=oinfo_min(goinfo, list_indices, minsize=minsize)
+
+    return goinfo_proc
+
+def task_oinfo_create_fit_correction(data_brain, beh, minsize=2, maxsize=4, method='gcmi'):
+
+    nfeat=data_brain.shape[1]
+    yfeat=beh.shape[1]
+    modely = hoi.metrics.Oinfo(data_brain, beh)
+    oinfoy = modely.fit(minsize=minsize, maxsize=maxsize, method=method)
+
+    model = hoi.metrics.Oinfo(data_brain)
+    oinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
+
+    oinfo_tot=np.vstack((oinfoy,oinfo))
+
+    combosy=modely.get_combinations(minsize=minsize, maxsize=maxsize)[0]
+    combos=-np.ones(combosy.shape)
+    #print(combos.shape, combosy.shape)
+    combos_=model.get_combinations(minsize=minsize, maxsize=maxsize)[0]
+    #print(combos.shape, combos_.shape)
+    combos[:combos_.shape[0],:combos_.shape[1]]=combos_
+    #print(combos.shape, combosy.shape)
+
+    list_indices=[[c for c in comb if c != -1] for comb in np.vstack((combosy, combos))]
+    list_multiplets=[str([int(i) for i in comb]) for comb in list_indices]
+    index_h = np.arange(0,len(combosy))
+
+    #Here we use the function defined in utils to "clean" the higher-order spreading
+    oinfo_proc=oinfo_min_task(oinfo_tot, list_indices, minsize, nroi=nfeat, ny=yfeat)
+
+    return oinfo_proc[index_h,:]
 
 def rsi_create_fit(data, beh, minsize=2, maxsize=3, method='gcmi'):
     
@@ -150,68 +210,6 @@ def centrality_create_fit_correction(data_brain, beh, minsize=3, maxsize=4, meth
     nodes=np.arange(n_features)
     res_cen= centrality_nodes(goinfo_proc, nodes, list_indices, normalized=normalized)
     return res_cen
-
-def goinfo_create_fit(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
-
-    model = hoi.metrics.GradientOinfo(data_brain, beh)
-    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
-    return goinfo
-
-def redundancyMMI_fit(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
-
-    model = hoi.metrics.RedundancyMMI(data_brain, beh)
-    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
-    return goinfo
-
-def synergyMMI_fit(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
-
-    model = hoi.metrics.SynergyMMI(data_brain, beh)
-    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
-    return goinfo
-
-
-def goinfo_create_fit_correction(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
-
-    model = hoi.metrics.GradientOinfo(data_brain, beh)
-    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
-
-    combos=model.get_combinations(minsize=minsize, maxsize=maxsize)[0]
-    list_indices=[[int(c) for c in comb if c != -1] for comb in combos]
-    list_multiplets=[str([int(i) for i in comb]) for comb in list_indices]
-
-    #Here we use the function defined in utils to "clean" the higher-order spreading
-    goinfo_proc=oinfo_min(goinfo, list_indices, minsize=minsize)
-
-    return goinfo_proc
-
-def task_oinfo_create_fit_correction(data_brain, beh, minsize=2, maxsize=4, method='gcmi'):
-
-    nfeat=data_brain.shape[1]
-    yfeat=beh.shape[1]
-    modely = hoi.metrics.Oinfo(data_brain, beh)
-    oinfoy = modely.fit(minsize=minsize, maxsize=maxsize, method=method)
-
-    model = hoi.metrics.Oinfo(data_brain)
-    oinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
-
-    oinfo_tot=np.vstack((oinfoy,oinfo))
-
-    combosy=modely.get_combinations(minsize=minsize, maxsize=maxsize)[0]
-    combos=-np.ones(combosy.shape)
-    #print(combos.shape, combosy.shape)
-    combos_=model.get_combinations(minsize=minsize, maxsize=maxsize)[0]
-    #print(combos.shape, combos_.shape)
-    combos[:combos_.shape[0],:combos_.shape[1]]=combos_
-    #print(combos.shape, combosy.shape)
-
-    list_indices=[[c for c in comb if c != -1] for comb in np.vstack((combosy, combos))]
-    list_multiplets=[str([int(i) for i in comb]) for comb in list_indices]
-    index_h = np.arange(0,len(combosy))
-
-    #Here we use the function defined in utils to "clean" the higher-order spreading
-    oinfo_proc=oinfo_min_task(oinfo_tot, list_indices, minsize, nroi=nfeat, ny=yfeat)
-
-    return oinfo_proc[index_h,:]
 
 def bootstrap(data, nboot=1000):
 
