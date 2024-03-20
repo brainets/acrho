@@ -3,6 +3,17 @@ from itertools import combinations
 import numpy as np
 import hoi
 import frites
+import pickle
+
+def saving(obj, name):
+    with open(name, "wb") as f:
+        pickle.dump(obj, f)
+        
+def loading(name):
+    with open(name,"rb") as f:
+        loaded_obj=pickle.load(f)
+        
+    return loaded_obj
 
 def rsi_create_fit(data, beh, minsize=2, maxsize=3, method='gcmi'):
     
@@ -114,8 +125,12 @@ def centrality_nodes(oinf_result, nodes, list_indices, normalized=True):
             if i in j:
                 s+=oinf_result[jj,:]
                 cc+=1
-        
-        centrality_results[i, :]=s/cc
+        if cc != 0:
+            if normalized:
+                centrality_results[i, :]=s/cc
+            else:
+                centrality_results[i, :]=s
+
 
     return centrality_results
 
@@ -141,6 +156,19 @@ def goinfo_create_fit(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
     model = hoi.metrics.GradientOinfo(data_brain, beh)
     goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
     return goinfo
+
+def redundancyMMI_fit(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
+
+    model = hoi.metrics.RedundancyMMI(data_brain, beh)
+    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
+    return goinfo
+
+def synergyMMI_fit(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
+
+    model = hoi.metrics.SynergyMMI(data_brain, beh)
+    goinfo = model.fit(minsize=minsize, maxsize=maxsize, method=method)
+    return goinfo
+
 
 def goinfo_create_fit_correction(data_brain, beh, minsize=3, maxsize=4, method='gcmi'):
 
@@ -176,10 +204,9 @@ def task_oinfo_create_fit_correction(data_brain, beh, minsize=2, maxsize=4, meth
     combos[:combos_.shape[0],:combos_.shape[1]]=combos_
     #print(combos.shape, combosy.shape)
 
-    list_indices=[[int(c) for c in comb if c != -1] for comb in np.vstack((combosy, combos))]
+    list_indices=[[c for c in comb if c != -1] for comb in np.vstack((combosy, combos))]
     list_multiplets=[str([int(i) for i in comb]) for comb in list_indices]
-    print(list_indices)
-    index_h = [i for i, ind in enumerate(list_indices) if nfeat+1 in ind]
+    index_h = np.arange(0,len(combosy))
 
     #Here we use the function defined in utils to "clean" the higher-order spreading
     oinfo_proc=oinfo_min_task(oinfo_tot, list_indices, minsize, nroi=nfeat, ny=yfeat)
